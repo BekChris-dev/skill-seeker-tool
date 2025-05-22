@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Settings as SettingsIcon, AlertCircle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, AlertCircle, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react';
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
 import { getApiKey, validateApiKey } from "@/services/llmService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -107,6 +107,41 @@ export default function Settings() {
                 API keys are stored only in memory during your session. In a production environment, 
                 these would be securely managed through a backend service.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <GitBranch className="mr-2 h-5 w-5" />
+              GitHub Repository Analysis
+            </CardTitle>
+            <CardDescription>
+              Direct analysis of GitHub repositories
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start space-x-2">
+              <div className="mt-1">
+                <GitPullRequest className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">Advanced GitHub URL Support</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  The tool now supports direct analysis of GitHub repositories, including specific branches and pull requests. 
+                  GPT-4o will analyze the code directly from GitHub without requiring any local processing.
+                </p>
+                
+                <div className="mt-3">
+                  <h4 className="text-sm font-medium">Supported GitHub URL formats:</h4>
+                  <ul className="list-disc pl-5 mt-1 space-y-1">
+                    <li className="text-sm text-muted-foreground">Standard repositories: <code className="text-xs bg-muted p-1 rounded">https://github.com/username/repo</code></li>
+                    <li className="text-sm text-muted-foreground">Specific branches: <code className="text-xs bg-muted p-1 rounded">https://github.com/username/repo/tree/branch-name</code></li>
+                    <li className="text-sm text-muted-foreground">Pull requests: <code className="text-xs bg-muted p-1 rounded">https://github.com/username/repo/pull/123</code></li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CandidateData } from "@/types/assessment";
-import { X, Folder, Github } from "lucide-react";
+import { X, Folder, Github, GitBranch, GitPullRequest } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CandidateFormProps {
   candidate: CandidateData;
@@ -52,17 +53,42 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="block text-sm font-medium mb-1 flex items-center">
             GitHub Repository URL
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="ml-1 inline-flex text-muted-foreground cursor-help">
+                    (?)
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>You can use any of these formats:</p>
+                  <ul className="mt-1 list-disc pl-4 text-xs">
+                    <li>Standard repo: https://github.com/username/repo</li>
+                    <li>Specific branch: https://github.com/username/repo/tree/branch-name</li>
+                    <li>Pull request: https://github.com/username/repo/pull/123</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </label>
           <div className="flex items-center gap-2">
-            <Github className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-shrink-0 flex gap-1">
+              <Github className="h-4 w-4 text-muted-foreground" />
+              <GitBranch className="h-4 w-4 text-muted-foreground" />
+              <GitPullRequest className="h-4 w-4 text-muted-foreground" />
+            </div>
             <Input
               value={candidate.githubRepo}
               onChange={(e) => updateCandidate(candidate.id, { githubRepo: e.target.value })}
               placeholder="https://github.com/username/repo"
+              className="flex-1"
             />
           </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            GPT-4o will analyze the GitHub repo directly, including specific branches or pull requests.
+          </p>
         </div>
 
         <div>

@@ -43,20 +43,21 @@ export const analyzeCode = async (
         continue;
       }
       
-      // Get code content based on source (GitHub or local)
-      console.log(`Fetching code content for ${candidate.name}`);
-      const codeContent = await fetchCodeContent(candidate);
-      console.log(`Code content fetched, length: ${codeContent.length} characters`);
-      
-      if (!codeContent || codeContent.trim() === '') {
-        throw new Error("No code content could be retrieved.");
+      // Determine the code source
+      let codeSource: string;
+      if (candidate.githubRepo && candidate.githubRepo.trim() !== '') {
+        console.log(`Using GitHub repository URL for ${candidate.name}: ${candidate.githubRepo}`);
+        codeSource = candidate.githubRepo;
+      } else if (candidate.localPath && candidate.localPath.trim() !== '') {
+        console.log(`Using local path for ${candidate.name}: ${candidate.localPath}`);
+        codeSource = `Local path: ${candidate.localPath}`;
+      } else {
+        throw new Error("No valid code source provided for the candidate.");
       }
       
-      // Prepare prompt for LLM analysis
-      const prompt = generateAnalysisPrompt(codeContent, assessmentInfo);
-      
-      // Call LLM API with the prompt
+      // Call LLM API with the GitHub URL or local path directly
       console.log(`Calling LLM API for ${candidate.name}...`);
+      const prompt = generateAnalysisPrompt(codeSource, assessmentInfo);
       const analysisResult = await callLLMApi(prompt);
       console.log(`LLM API response received for ${candidate.name}`);
       
@@ -82,76 +83,21 @@ export const analyzeCode = async (
   return results.sort((a, b) => b.scores.overallScore - a.scores.overallScore);
 };
 
-// Helper function to fetch code content from GitHub or local path
-const fetchCodeContent = async (candidate: CandidateData): Promise<string> => {
-  if (candidate.githubRepo && candidate.githubRepo.trim() !== '') {
-    return await fetchGitHubRepository(candidate.githubRepo);
-  } else if (candidate.localPath && candidate.localPath.trim() !== '') {
-    return await readLocalFiles(candidate.localPath);
-  }
-  throw new Error("No valid code source provided for the candidate.");
-};
+// Generate a prompt for the LLM to analyze the GitHub repository directly
+const generateAnalysisPrompt = (codeSource: string, assessmentInfo: AssessmentInfo): string => {
+  const isGitHubUrl = codeSource.includes('github.com');
 
-// Function to fetch code from GitHub repository
-const fetchGitHubRepository = async (repoUrl: string): Promise<string> => {
-  // Extract owner and repo name from GitHub URL
-  const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)/;
-  const match = repoUrl.match(urlPattern);
-  
-  if (!match || match.length < 3) {
-    throw new Error("Invalid GitHub repository URL");
-  }
-  
-  const [, owner, repo] = match;
-  
-  try {
-    // Use GitHub API to get repository content
-    // Note: This is a simplified implementation and would need proper pagination for larger repos
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`);
-    
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    // Fetch file contents (limited to reasonable size)
-    let codeContent = '';
-    for (const file of data) {
-      if (file.type === 'file' && isCodeFile(file.name)) {
-        const fileResponse = await fetch(file.download_url);
-        const fileContent = await fileResponse.text();
-        codeContent += `\n// File: ${file.path}\n${fileContent}\n`;
-      }
-    }
-    
-    return codeContent;
-  } catch (error) {
-    console.error("Error fetching GitHub repository:", error);
-    throw new Error("Failed to fetch code from GitHub repository");
-  }
-};
-
-// Function to read local files
-const readLocalFiles = async (localPath: string): Promise<string> => {
-  // In a real implementation, this would use the File System Access API
-  // For now, we'll just mock the response since we can't actually access local files
-  console.log(`Attempting to read files from local path: ${localPath}`);
-  return `// Mock content for local path: ${localPath}\n// In a real implementation, we would read actual files here.`;
-};
-
-// Check if file is a code file we should analyze
-const isCodeFile = (filename: string): boolean => {
-  const codeExtensions = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.c', '.cpp', '.cs', '.go', '.rb', '.php'];
-  return codeExtensions.some(ext => filename.toLowerCase().endsWith(ext));
-};
-
-// Generate a prompt for the LLM to analyze the code
-const generateAnalysisPrompt = (codeContent: string, assessmentInfo: AssessmentInfo): string => {
   return `
-    As a coding expert, please analyze the following code submission for a ${assessmentInfo.roleName} position at ${assessmentInfo.seniorityLevel} level.
+    As a coding expert, please analyze the following ${isGitHubUrl ? 'GitHub repository' : 'code'} for a ${assessmentInfo.roleName} position at ${assessmentInfo.seniorityLevel} level.
     
     Assessment description: ${assessmentInfo.assessmentDescription}
+    
+    ${isGitHubUrl ? 'GitHub Repository URL:' : 'Code Source:'} ${codeSource}
+    
+    ${isGitHubUrl ? 
+    `Please browse the repository contents directly. If this is a specific branch or pull request URL, please examine that specific code.
+    Look through the code files, focusing on the main application logic, and ignoring build artifacts, dependencies, and non-code files.` : 
+    'Please analyze the provided code.'}
     
     Analyze the code for:
     1. Readability (variable names, comments, consistent style)
@@ -159,9 +105,6 @@ const generateAnalysisPrompt = (codeContent: string, assessmentInfo: AssessmentI
     3. Testability (separation of concerns, dependency injection, pure functions)
     4. Originality vs AI-generated appearance
     5. Seniority fit for a ${assessmentInfo.seniorityLevel} role
-    
-    Code:
-    ${codeContent}
     
     Provide scores from 0-100 for each category and detailed feedback including strengths and areas to improve.
     Format your response as JSON with the following structure:
