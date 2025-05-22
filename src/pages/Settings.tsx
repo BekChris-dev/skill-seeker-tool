@@ -3,22 +3,54 @@ import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Settings as SettingsIcon, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, AlertCircle, ExternalLink } from 'lucide-react';
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
-import { getApiKey } from "@/services/llmService";
+import { getApiKey, validateApiKey } from "@/services/llmService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "@/hooks/use-toast";
 
 export default function Settings() {
   const [isKeySet, setIsKeySet] = useState(false);
+  const [isKeyValid, setIsKeyValid] = useState(false);
   
   useEffect(() => {
     // Check if API key is set when component mounts
-    setIsKeySet(!!getApiKey());
+    const currentKey = getApiKey();
+    setIsKeySet(!!currentKey);
+    
+    // Check if the key format seems valid
+    if (currentKey) {
+      setIsKeyValid(validateApiKey(currentKey));
+      if (!validateApiKey(currentKey)) {
+        toast({
+          title: "API Key Format Warning",
+          description: "Your API key doesn't match the expected OpenAI format. OpenAI keys usually start with 'sk-'.",
+          variant: "destructive",
+        });
+      }
+    }
   }, []);
 
   const handleApiKeySet = (isSet: boolean) => {
     console.log("API key set:", isSet);
     setIsKeySet(isSet);
+    
+    // Check if new key format seems valid
+    if (isSet) {
+      const currentKey = getApiKey();
+      const isValid = validateApiKey(currentKey);
+      setIsKeyValid(isValid);
+      
+      if (!isValid) {
+        toast({
+          title: "API Key Format Warning",
+          description: "Your API key doesn't match the expected OpenAI format. OpenAI keys usually start with 'sk-'.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      setIsKeyValid(false);
+    }
   };
 
   return (
@@ -46,13 +78,24 @@ export default function Settings() {
           <CardContent>
             <ApiKeyInput onApiKeySet={handleApiKeySet} />
             
-            {isKeySet && (
+            {isKeySet && isKeyValid && (
               <Alert className="mt-4" variant="default">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>API Key Status</AlertTitle>
                 <AlertDescription>
                   Your API key is set and will be used for code analysis. To test if your key works correctly,
                   try analyzing a code sample on the Code Assessment page.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {isKeySet && !isKeyValid && (
+              <Alert className="mt-4" variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Invalid API Key Format</AlertTitle>
+                <AlertDescription>
+                  The API key you've entered doesn't match the expected OpenAI format. 
+                  OpenAI API keys should start with 'sk-'. Please check your API key.
                 </AlertDescription>
               </Alert>
             )}
@@ -87,6 +130,16 @@ export default function Settings() {
               <AlertDescription>
                 Your OpenAI API key must have access to GPT-4o. If you're experiencing issues with the assessment,
                 make sure your account has the correct permissions for this model.
+                <div className="mt-2">
+                  <a 
+                    href="https://platform.openai.com/docs/models/gpt-4o" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Check GPT-4o access <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
+                </div>
               </AlertDescription>
             </Alert>
           </CardContent>

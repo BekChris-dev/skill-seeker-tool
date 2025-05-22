@@ -8,10 +8,17 @@ let apiKey = '';
 
 export const setApiKey = (key: string) => {
   apiKey = key;
+  console.log("API key set:", key ? "Key provided (length: " + key.length + ")" : "No key");
 };
 
 export const getApiKey = () => {
   return apiKey;
+};
+
+// Check if API key seems valid in format
+export const validateApiKey = (key: string): boolean => {
+  // OpenAI API keys usually start with "sk-" and have a specific format/length
+  return key.trim().startsWith('sk-') && key.trim().length > 20;
 };
 
 // Function to analyze code using the LLM API
@@ -183,6 +190,17 @@ const callLLMApi = async (prompt: string): Promise<string> => {
   // Example using OpenAI API - replace with your preferred LLM provider
   try {
     console.log("Making OpenAI API request...");
+    
+    // For debugging - log the request body (excluding the full prompt for security)
+    console.log("Request details:", {
+      model: 'gpt-4o',
+      temperature: 0.2,
+      max_tokens: 2000,
+      apiKeyProvided: !!apiKey,
+      apiKeyLength: apiKey.length,
+      apiKeyFormat: apiKey.startsWith('sk-') ? 'starts with sk-' : 'invalid format'
+    });
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -200,17 +218,42 @@ const callLLMApi = async (prompt: string): Promise<string> => {
     console.log("OpenAI API Response Status:", response.status);
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.error?.message || response.statusText || 'Unknown API error';
-      console.error("OpenAI API Error:", errorData);
-      throw new Error(`API request failed: ${errorMessage}`);
+      // Log more details about the error
+      let errorMessage = `API request failed with status ${response.status}`;
+      let errorData = null;
+      
+      try {
+        errorData = await response.json();
+        console.error("OpenAI API Error Details:", errorData);
+        
+        if (errorData?.error?.message) {
+          errorMessage = errorData.error.message;
+          
+          // Specific error handling based on common issues
+          if (errorMessage.includes("Incorrect API key")) {
+            throw new Error("Invalid API key. Please check your OpenAI API key and try again.");
+          } else if (errorMessage.includes("You exceeded your current quota")) {
+            throw new Error("OpenAI API quota exceeded. Please check your billing information.");
+          } else if (errorMessage.includes("model_not_found") || errorMessage.includes("does not exist")) {
+            throw new Error("Your OpenAI account doesn't have access to the GPT-4o model. Please use a different model or request access.");
+          } else if (response.status === 429) {
+            throw new Error("Rate limit exceeded. Please try again in a few moments.");
+          }
+        }
+      } catch (jsonError) {
+        // If we can't parse the error as JSON, use the status text
+        console.error("Error parsing API error response:", jsonError);
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    console.log("OpenAI API Response:", data);
+    console.log("OpenAI API Response structure:", Object.keys(data));
     
     if (!data.choices || data.choices.length === 0) {
-      throw new Error("No response content received from API");
+      console.error("Invalid API response format:", data);
+      throw new Error("No response content received from API. Invalid response format.");
     }
     
     return data.choices[0].message.content;
