@@ -1,6 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { Code, Settings } from "lucide-react";
 
 const Index = () => {
   return (
@@ -15,7 +16,14 @@ const Index = () => {
         <div className="flex gap-4 justify-center">
           <Button asChild size="lg">
             <Link to="/code-assessment">
+              <Code className="mr-2 h-5 w-5" />
               Get Started
+            </Link>
+          </Button>
+          <Button variant="outline" asChild size="lg">
+            <Link to="/settings">
+              <Settings className="mr-2 h-5 w-5" />
+              Settings
             </Link>
           </Button>
         </div>

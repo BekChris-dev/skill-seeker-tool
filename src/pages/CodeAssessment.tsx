@@ -25,6 +25,8 @@ import { toast } from "@/hooks/use-toast";
 import CandidateForm from "@/components/assessment/CandidateForm";
 import { CandidateData, AssessmentResults } from "@/types/assessment";
 import AssessmentResultsView from "@/components/assessment/AssessmentResultsView";
+import ApiKeyInput from "@/components/assessment/ApiKeyInput";
+import { analyzeCode, getApiKey } from "@/services/llmService";
 
 const formSchema = z.object({
   roleName: z.string().min(3, {
@@ -48,6 +50,7 @@ export default function CodeAssessment() {
   const [assessmentResults, setAssessmentResults] = useState<AssessmentResults | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [isApiKeySet, setIsApiKeySet] = useState(!!getApiKey());
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -92,50 +95,39 @@ export default function CodeAssessment() {
     }
   };
 
-  const analyzeCode = async (formData: z.infer<typeof formSchema>) => {
+  const analyzeCodeAndUpdateResults = async (formData: z.infer<typeof formSchema>) => {
     setIsAnalyzing(true);
     
     try {
-      // Simulate code analysis process
-      // In a real implementation, this would connect to your backend service
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check if API key is set
+      if (!getApiKey()) {
+        toast({
+          title: "API Key Required",
+          description: "Please set your OpenAI API key to analyze code",
+          variant: "destructive",
+        });
+        setIsAnalyzing(false);
+        return;
+      }
       
-      const mockResults: AssessmentResults = {
-        assessmentInfo: {
-          roleName: formData.roleName,
-          seniorityLevel: formData.seniorityLevel,
-          assessmentDescription: formData.assessmentDescription,
-          assessmentLink: formData.assessmentLink || undefined,
-        },
-        candidateResults: candidates.map(candidate => ({
-          candidateId: candidate.id,
-          candidateName: candidate.name,
-          scores: {
-            readability: Math.floor(Math.random() * 41) + 60, // 60-100
-            extensibility: Math.floor(Math.random() * 41) + 60,
-            testability: Math.floor(Math.random() * 41) + 60,
-            originalityScore: Math.floor(Math.random() * 41) + 60,
-            overallScore: 0, // Will be calculated
-            seniorityFit: Math.floor(Math.random() * 41) + 60,
-          },
-          feedback: [
-            "Good use of design patterns",
-            "Could improve documentation",
-            "Test coverage is adequate",
-          ],
-          strengths: ["Code organization", "Performance optimization"],
-          areasToImprove: ["Error handling", "Edge case coverage"],
-        })),
+      // Prepare assessment info
+      const assessmentInfo = {
+        roleName: formData.roleName,
+        seniorityLevel: formData.seniorityLevel,
+        assessmentDescription: formData.assessmentDescription,
+        assessmentLink: formData.assessmentLink || undefined,
       };
       
-      // Calculate overall scores and sort by best match
-      mockResults.candidateResults = mockResults.candidateResults.map(result => {
-        const { readability, extensibility, testability, seniorityFit, originalityScore } = result.scores;
-        result.scores.overallScore = Math.round((readability + extensibility + testability + seniorityFit + originalityScore) / 5);
-        return result;
-      }).sort((a, b) => b.scores.overallScore - a.scores.overallScore);
+      // Call the LLM service to analyze code
+      const candidateResults = await analyzeCode(candidates, assessmentInfo);
       
-      setAssessmentResults(mockResults);
+      // Create the assessment results object
+      const results: AssessmentResults = {
+        assessmentInfo,
+        candidateResults,
+      };
+      
+      setAssessmentResults(results);
       setShowResults(true);
       
       toast({
@@ -143,9 +135,10 @@ export default function CodeAssessment() {
         description: `${candidates.length} candidate code submissions analyzed.`,
       });
     } catch (error) {
+      console.error("Error analyzing code:", error);
       toast({
         title: "Analysis Failed",
-        description: "Failed to analyze code. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to analyze code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -169,7 +162,11 @@ export default function CodeAssessment() {
       return;
     }
     
-    analyzeCode(data);
+    analyzeCodeAndUpdateResults(data);
+  };
+
+  const handleApiKeySet = (isSet: boolean) => {
+    setIsApiKeySet(isSet);
   };
 
   return (
@@ -177,6 +174,8 @@ export default function CodeAssessment() {
       <h1 className="text-3xl font-bold mb-8 text-center">
         Code Assessment Tool
       </h1>
+      
+      <ApiKeyInput onApiKeySet={handleApiKeySet} />
       
       <Card className="p-6">
         <Form {...form}>
@@ -280,10 +279,15 @@ export default function CodeAssessment() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || !isApiKeySet}
             >
               {isAnalyzing ? "Analyzing..." : "Analyze Code"}
             </Button>
+            {!isApiKeySet && (
+              <p className="text-center text-sm text-muted-foreground">
+                Please set your API key above to enable code analysis
+              </p>
+            )}
           </form>
         </Form>
       </Card>
