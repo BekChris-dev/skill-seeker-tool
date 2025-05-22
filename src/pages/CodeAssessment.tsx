@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -32,9 +31,7 @@ const formSchema = z.object({
   roleName: z.string().min(3, {
     message: "Role name must be at least 3 characters.",
   }),
-  assessmentDescription: z.string().min(10, {
-    message: "Assessment description must be at least 10 characters.",
-  }),
+  assessmentDescription: z.string().optional(),
   assessmentLink: z.string().url({
     message: "Please enter a valid URL.",
   }).optional().or(z.literal('')),
@@ -114,7 +111,7 @@ export default function CodeAssessment() {
       const assessmentInfo = {
         roleName: formData.roleName,
         seniorityLevel: formData.seniorityLevel,
-        assessmentDescription: formData.assessmentDescription,
+        assessmentDescription: formData.assessmentDescription || "",
         assessmentLink: formData.assessmentLink || undefined,
       };
       
@@ -223,7 +220,7 @@ export default function CodeAssessment() {
               name="assessmentDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assessment Description</FormLabel>
+                  <FormLabel>Assessment Description (Optional)</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Describe the assessment task and requirements..." 
