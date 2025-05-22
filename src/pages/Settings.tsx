@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Settings as SettingsIcon, AlertCircle, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, AlertCircle, ExternalLink, GitBranch, GitPullRequest, Zap } from 'lucide-react';
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
+import ModelSelector from "@/components/assessment/ModelSelector";
 import { getApiKey, validateApiKey } from "@/services/llmService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
@@ -114,6 +114,44 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
+              <Zap className="mr-2 h-5 w-5" />
+              Model Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure which OpenAI model to use for analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ModelSelector />
+            
+            <Alert className="mt-4" variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Model Selection Tips</AlertTitle>
+              <AlertDescription>
+                <p>If you're experiencing quota exceeded errors, try selecting a less expensive model:</p>
+                <ul className="list-disc pl-5 mt-1 space-y-1">
+                  <li className="text-sm">GPT-4o: Highest quality but most expensive</li>
+                  <li className="text-sm">GPT-4o Mini: Good balance of cost and capability</li>
+                  <li className="text-sm">GPT-3.5 Turbo: Most affordable option</li>
+                </ul>
+                <div className="mt-2">
+                  <a 
+                    href="https://platform.openai.com/account/billing/overview" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Check OpenAI billing status <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
               <GitBranch className="mr-2 h-5 w-5" />
               GitHub Repository Analysis
             </CardTitle>
@@ -143,40 +181,6 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Model Configuration</CardTitle>
-            <CardDescription>
-              Configure model settings (Currently using OpenAI's GPT-4o)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Model configuration options will be available in future versions. Currently, the tool
-              is configured to use OpenAI's GPT-4o model for optimal code analysis results.
-            </p>
-            
-            <Alert className="mt-4" variant="warning">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Access Requirements</AlertTitle>
-              <AlertDescription>
-                Your OpenAI API key must have access to GPT-4o. If you're experiencing issues with the assessment,
-                make sure your account has the correct permissions for this model.
-                <div className="mt-2">
-                  <a 
-                    href="https://platform.openai.com/docs/models/gpt-4o" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    Check GPT-4o access <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
-                </div>
-              </AlertDescription>
-            </Alert>
           </CardContent>
         </Card>
       </div>

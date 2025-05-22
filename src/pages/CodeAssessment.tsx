@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,6 +26,7 @@ import CandidateForm from "@/components/assessment/CandidateForm";
 import { CandidateData, AssessmentResults } from "@/types/assessment";
 import AssessmentResultsView from "@/components/assessment/AssessmentResultsView";
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
+import ModelSelector from "@/components/assessment/ModelSelector";
 import { analyzeCode, getApiKey } from "@/services/llmService";
 
 const formSchema = z.object({
@@ -133,9 +135,26 @@ export default function CodeAssessment() {
       });
     } catch (error) {
       console.error("Error analyzing code:", error);
+      
+      // Enhanced error handling with more specific messages
+      let errorMessage = error instanceof Error ? error.message : "Failed to analyze code. Please try again.";
+      let errorTitle = "Analysis Failed";
+      
+      // Provide more helpful messages for common errors
+      if (errorMessage.includes("quota exceeded") || errorMessage.includes("billing")) {
+        errorTitle = "API Quota Exceeded";
+        errorMessage = "Your OpenAI API quota has been exceeded. Please check your billing status or try using a different model.";
+      } else if (errorMessage.includes("rate limit")) {
+        errorTitle = "Rate Limit Reached";
+        errorMessage = "You've hit the OpenAI rate limit. Please wait a moment and try again.";
+      } else if (errorMessage.includes("model_not_found") || errorMessage.includes("doesn't have access")) {
+        errorTitle = "Model Access Issue";
+        errorMessage = "Your API key doesn't have access to the selected model. Try selecting a different model below.";
+      }
+      
       toast({
-        title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Failed to analyze code. Please try again.",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -173,6 +192,7 @@ export default function CodeAssessment() {
       </h1>
       
       <ApiKeyInput onApiKeySet={handleApiKeySet} />
+      <ModelSelector />
       
       <Card className="p-6">
         <Form {...form}>

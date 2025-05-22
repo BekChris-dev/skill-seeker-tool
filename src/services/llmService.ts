@@ -5,6 +5,7 @@ import { AssessmentInfo, CandidateData, CandidateResult } from "@/types/assessme
 // API key management - in a production app, this would be handled through environment variables
 // and proper backend authentication
 let apiKey = '';
+let selectedModel = 'gpt-4o'; // Default to GPT-4o
 
 export const setApiKey = (key: string) => {
   apiKey = key;
@@ -14,6 +15,22 @@ export const setApiKey = (key: string) => {
 export const getApiKey = () => {
   return apiKey;
 };
+
+export const setModel = (model: string) => {
+  selectedModel = model;
+  console.log("Model set to:", model);
+};
+
+export const getModel = () => {
+  return selectedModel;
+};
+
+// Available models for fallback strategy
+export const AVAILABLE_MODELS = [
+  { id: 'gpt-4o', name: 'GPT-4o', description: 'Most capable model, best quality but highest cost' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Good balance of capability and cost' },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fastest and most affordable option' }
+];
 
 // Check if API key seems valid in format
 export const validateApiKey = (key: string): boolean => {
@@ -58,7 +75,60 @@ export const analyzeCode = async (
       // Call LLM API with the GitHub URL or local path directly
       console.log(`Calling LLM API for ${candidate.name}...`);
       const prompt = generateAnalysisPrompt(codeSource, assessmentInfo);
-      const analysisResult = await callLLMApi(prompt);
+      
+      // Try with the selected model first, then fall back to less expensive models if needed
+      let analysisResult;
+      try {
+        analysisResult = await callLLMApi(prompt, selectedModel);
+      } catch (apiError: any) {
+        // Handle quota exceeded or model access errors specifically
+        if (apiError?.message?.includes("quota exceeded") || apiError?.message?.includes("rate limit")) {
+          console.log(`Quota exceeded for ${selectedModel}, trying fallback models...`);
+          
+          // If using gpt-4o and it fails, try gpt-4o-mini
+          if (selectedModel === 'gpt-4o') {
+            toast({
+              title: "Model fallback initiated",
+              description: "Quota exceeded for GPT-4o, falling back to GPT-4o Mini",
+            });
+            try {
+              analysisResult = await callLLMApi(prompt, 'gpt-4o-mini');
+            } catch (fallbackError: any) {
+              // If gpt-4o-mini fails too, try gpt-3.5-turbo as last resort
+              if (fallbackError?.message?.includes("quota exceeded") || fallbackError?.message?.includes("rate limit")) {
+                toast({
+                  title: "Model fallback initiated",
+                  description: "Trying GPT-3.5 Turbo as last resort",
+                });
+                analysisResult = await callLLMApi(prompt, 'gpt-3.5-turbo');
+              } else {
+                throw fallbackError;
+              }
+            }
+          }
+          // If using gpt-4o-mini and it fails, try gpt-3.5-turbo
+          else if (selectedModel === 'gpt-4o-mini') {
+            toast({
+              title: "Model fallback initiated",
+              description: "Quota exceeded for GPT-4o Mini, falling back to GPT-3.5 Turbo",
+            });
+            analysisResult = await callLLMApi(prompt, 'gpt-3.5-turbo');
+          } else {
+            // No more fallbacks available
+            throw new Error(
+              "API quota exceeded for all available models. Please check your OpenAI billing status or try again later."
+            );
+          }
+        } else if (apiError?.message?.includes("does not exist") || apiError?.message?.includes("model_not_found")) {
+          throw new Error(
+            "Your OpenAI account doesn't have access to the requested model. Please try a different model or request access from OpenAI."
+          );
+        } else {
+          // Re-throw other errors
+          throw apiError;
+        }
+      }
+      
       console.log(`LLM API response received for ${candidate.name}`);
       
       // Parse the LLM response into our candidate result format
@@ -90,7 +160,7 @@ const generateAnalysisPrompt = (codeSource: string, assessmentInfo: AssessmentIn
   return `
     As a coding expert, please analyze the following ${isGitHubUrl ? 'GitHub repository' : 'code'} for a ${assessmentInfo.roleName} position at ${assessmentInfo.seniorityLevel} level.
     
-    Assessment description: ${assessmentInfo.assessmentDescription}
+    Assessment description: ${assessmentInfo.assessmentDescription || "No specific assessment description provided"}
     
     ${isGitHubUrl ? 'GitHub Repository URL:' : 'Code Source:'} ${codeSource}
     
@@ -125,18 +195,18 @@ const generateAnalysisPrompt = (codeSource: string, assessmentInfo: AssessmentIn
 };
 
 // Call the LLM API with the prepared prompt
-const callLLMApi = async (prompt: string): Promise<string> => {
+const callLLMApi = async (prompt: string, model: string = 'gpt-4o'): Promise<string> => {
   if (!apiKey) {
     throw new Error("API key not provided");
   }
 
   // Example using OpenAI API - replace with your preferred LLM provider
   try {
-    console.log("Making OpenAI API request...");
+    console.log(`Making OpenAI API request using model: ${model}...`);
     
     // For debugging - log the request body (excluding the full prompt for security)
     console.log("Request details:", {
-      model: 'gpt-4o',
+      model,
       temperature: 0.2,
       max_tokens: 2000,
       apiKeyProvided: !!apiKey,
@@ -151,7 +221,7 @@ const callLLMApi = async (prompt: string): Promise<string> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 2000,
@@ -172,15 +242,27 @@ const callLLMApi = async (prompt: string): Promise<string> => {
         if (errorData?.error?.message) {
           errorMessage = errorData.error.message;
           
-          // Specific error handling based on common issues
+          // Enhanced error handling with specific user-friendly messages
           if (errorMessage.includes("Incorrect API key")) {
             throw new Error("Invalid API key. Please check your OpenAI API key and try again.");
           } else if (errorMessage.includes("You exceeded your current quota")) {
-            throw new Error("OpenAI API quota exceeded. Please check your billing information.");
+            // Improved quota exceeded message
+            throw new Error(
+              "OpenAI API quota exceeded. Please check your billing information or add credits to your OpenAI account."
+            );
           } else if (errorMessage.includes("model_not_found") || errorMessage.includes("does not exist")) {
-            throw new Error("Your OpenAI account doesn't have access to the GPT-4o model. Please use a different model or request access.");
+            throw new Error(
+              `Your OpenAI account doesn't have access to the ${model} model. Please use a different model or request access from OpenAI.`
+            );
           } else if (response.status === 429) {
-            throw new Error("Rate limit exceeded. Please try again in a few moments.");
+            // Enhanced rate limit message
+            throw new Error(
+              "Rate limit exceeded. Please try again in a few moments or consider upgrading your OpenAI account for higher rate limits."
+            );
+          } else if (errorMessage.includes("billing") || errorMessage.includes("payment")) {
+            throw new Error(
+              "There's an issue with your OpenAI billing. Please check your payment details in your OpenAI account."
+            );
           }
         }
       } catch (jsonError) {
