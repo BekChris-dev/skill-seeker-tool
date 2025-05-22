@@ -9,9 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle, KeyRound } from "lucide-react";
-import { getApiKey, setApiKey } from "@/services/llmService";
+import { getApiKey, setApiKey, setDemoMode, isDemoMode } from "@/services/llmService";
 
 interface ApiKeyInputProps {
   onApiKeySet: (isSet: boolean) => void;
@@ -20,6 +21,7 @@ interface ApiKeyInputProps {
 const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySet }) => {
   const [apiKey, setApiKeyState] = useState("");
   const [isKeySet, setIsKeySet] = useState(!!getApiKey());
+  const [demoEnabled, setDemoEnabled] = useState(isDemoMode());
 
   const handleSetApiKey = () => {
     if (!apiKey.trim()) {
@@ -36,6 +38,12 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySet }) => {
       setApiKey(apiKey);
       setIsKeySet(true);
       onApiKeySet(true);
+      
+      // Disable demo mode when API key is set
+      if (demoEnabled) {
+        setDemoEnabled(false);
+        setDemoMode(false);
+      }
       
       toast({
         title: "API Key Set",
@@ -63,6 +71,23 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySet }) => {
       description: "Your API key has been cleared",
       variant: "default",
     });
+  };
+
+  const handleToggleDemo = (enabled: boolean) => {
+    setDemoEnabled(enabled);
+    setDemoMode(enabled);
+    
+    if (enabled) {
+      toast({
+        title: "Demo Mode Enabled",
+        description: "Using mock analysis data for demonstration purposes",
+      });
+    } else {
+      toast({
+        title: "Demo Mode Disabled",
+        description: "Using the actual OpenAI API for analysis",
+      });
+    }
   };
 
   return (
@@ -103,12 +128,39 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySet }) => {
             </Button>
           )}
         </div>
+        
         {!isKeySet && (
+          <div className="mt-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-sm">Demo Mode</h3>
+                <p className="text-xs text-muted-foreground">
+                  Use mock data to demonstrate the analysis functionality
+                </p>
+              </div>
+              <Switch
+                checked={demoEnabled}
+                onCheckedChange={handleToggleDemo}
+              />
+            </div>
+          </div>
+        )}
+        
+        {!isKeySet && !demoEnabled && (
           <div className="mt-2 flex items-start text-xs text-amber-600">
             <AlertCircle className="mr-1 h-4 w-4" />
             <p>
               Your API key is stored only in memory and will be lost when you refresh the page.
               For actual implementation, a more secure approach would be used.
+            </p>
+          </div>
+        )}
+        
+        {demoEnabled && (
+          <div className="mt-2 flex items-start text-xs text-blue-600">
+            <AlertCircle className="mr-1 h-4 w-4" />
+            <p>
+              Demo mode is enabled. Analysis results will use mock data instead of the OpenAI API.
             </p>
           </div>
         )}

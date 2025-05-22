@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 import { AssessmentInfo, CandidateData, CandidateResult } from "@/types/assessment";
 
@@ -6,6 +5,7 @@ import { AssessmentInfo, CandidateData, CandidateResult } from "@/types/assessme
 // and proper backend authentication
 let apiKey = '';
 let selectedModel = 'gpt-4o'; // Default to GPT-4o
+let demoMode = false; // Demo mode flag
 
 export const setApiKey = (key: string) => {
   apiKey = key;
@@ -23,6 +23,16 @@ export const setModel = (model: string) => {
 
 export const getModel = () => {
   return selectedModel;
+};
+
+// Demo mode management
+export const setDemoMode = (enabled: boolean) => {
+  demoMode = enabled;
+  console.log("Demo mode set to:", enabled);
+};
+
+export const isDemoMode = () => {
+  return demoMode;
 };
 
 // Available models for fallback strategy
@@ -43,8 +53,14 @@ export const analyzeCode = async (
   candidates: CandidateData[],
   assessmentInfo: AssessmentInfo
 ): Promise<CandidateResult[]> => {
+  // Check if demo mode is enabled, if so return mock results
+  if (demoMode) {
+    console.log("Demo mode is enabled, returning mock results");
+    return generateMockResults(candidates, assessmentInfo);
+  }
+
   if (!apiKey) {
-    throw new Error("API key not set. Please provide an API key.");
+    throw new Error("API key not set. Please provide an API key or enable Demo Mode.");
   }
 
   const results: CandidateResult[] = [];
@@ -151,6 +167,87 @@ export const analyzeCode = async (
 
   // Sort by overall score (highest first)
   return results.sort((a, b) => b.scores.overallScore - a.scores.overallScore);
+};
+
+// Generate mock results for demo mode
+const generateMockResults = (
+  candidates: CandidateData[],
+  assessmentInfo: AssessmentInfo
+): CandidateResult[] => {
+  console.log("Generating mock results for", candidates.length, "candidates");
+  
+  // Mock data for strengths, areas to improve, and feedback
+  const mockStrengths = [
+    "Clean, consistent code formatting throughout the codebase",
+    "Good separation of concerns with components and services",
+    "Effective use of TypeScript for type safety",
+    "Well-structured architecture that follows industry best practices",
+    "Comprehensive error handling with user-friendly messages",
+    "Good use of React hooks and functional components",
+    "Thorough documentation and comments explaining complex logic"
+  ];
+  
+  const mockAreasToImprove = [
+    "Consider adding more automated tests to improve coverage",
+    "Some components could be broken down into smaller, reusable pieces",
+    "State management could be more centralized to avoid prop drilling",
+    "Some functions are overly complex and could be simplified",
+    "Documentation could be improved in some areas",
+    "Consider adding performance optimizations for large data sets",
+    "Error handling could be more comprehensive in edge cases"
+  ];
+  
+  const mockFeedback = [
+    "The code demonstrates a good understanding of modern web development practices",
+    "The use of TypeScript enhances code maintainability and helps catch potential errors",
+    "The architecture is scalable and would work well for larger applications",
+    "The UI components are well-designed and provide a good user experience",
+    "Code organization follows logical patterns making it easy to navigate",
+    "Error states are handled gracefully with clear user feedback",
+    "The codebase shows attention to detail and care for user experience"
+  ];
+  
+  // Create mock results for each candidate
+  return candidates.map((candidate, index) => {
+    // Generate random scores that make sense for the candidate's index
+    // First candidates get better scores in demo mode
+    const baseScore = Math.max(65, 95 - (index * 10));
+    const randomVariation = (score: number) => Math.min(100, Math.max(0, score + Math.floor(Math.random() * 10) - 5));
+    
+    const readability = randomVariation(baseScore);
+    const extensibility = randomVariation(baseScore - 2);
+    const testability = randomVariation(baseScore - 5);
+    const originalityScore = randomVariation(baseScore);
+    const seniorityFit = randomVariation(baseScore + 3);
+    
+    // Calculate overall score
+    const overallScore = Math.round(
+      (readability + extensibility + testability + originalityScore + seniorityFit) / 5
+    );
+    
+    // Select random items from the mock data arrays
+    const getRandomItems = (items: string[], count: number) => {
+      const shuffled = [...items].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count);
+    };
+    
+    // Return the mock candidate result
+    return {
+      candidateId: candidate.id,
+      candidateName: candidate.name || `Candidate ${candidate.id}`,
+      scores: {
+        readability,
+        extensibility,
+        testability,
+        originalityScore,
+        seniorityFit,
+        overallScore
+      },
+      feedback: getRandomItems(mockFeedback, 3 + Math.floor(Math.random() * 2)),
+      strengths: getRandomItems(mockStrengths, 3 + Math.floor(Math.random() * 2)),
+      areasToImprove: getRandomItems(mockAreasToImprove, 3 + Math.floor(Math.random() * 2))
+    };
+  }).sort((a, b) => b.scores.overallScore - a.scores.overallScore); // Sort by overall score
 };
 
 // Generate a prompt for the LLM to analyze the GitHub repository directly

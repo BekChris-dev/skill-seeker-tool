@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -27,7 +26,7 @@ import { CandidateData, AssessmentResults } from "@/types/assessment";
 import AssessmentResultsView from "@/components/assessment/AssessmentResultsView";
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
 import ModelSelector from "@/components/assessment/ModelSelector";
-import { analyzeCode, getApiKey } from "@/services/llmService";
+import { analyzeCode, getApiKey, isDemoMode } from "@/services/llmService";
 
 const formSchema = z.object({
   roleName: z.string().min(3, {
@@ -98,11 +97,11 @@ export default function CodeAssessment() {
     setIsAnalyzing(true);
     
     try {
-      // Check if API key is set
-      if (!getApiKey()) {
+      // Check if API key is set or demo mode is enabled
+      if (!getApiKey() && !isDemoMode()) {
         toast({
           title: "API Key Required",
-          description: "Please set your OpenAI API key to analyze code",
+          description: "Please set your OpenAI API key or enable Demo Mode to analyze code",
           variant: "destructive",
         });
         setIsAnalyzing(false);
@@ -130,8 +129,8 @@ export default function CodeAssessment() {
       setShowResults(true);
       
       toast({
-        title: "Analysis Complete",
-        description: `${candidates.length} candidate code submissions analyzed.`,
+        title: isDemoMode() ? "Demo Analysis Complete" : "Analysis Complete",
+        description: `${candidates.length} candidate code ${isDemoMode() ? "(mock data)" : ""} submissions analyzed.`,
       });
     } catch (error) {
       console.error("Error analyzing code:", error);
@@ -143,13 +142,13 @@ export default function CodeAssessment() {
       // Provide more helpful messages for common errors
       if (errorMessage.includes("quota exceeded") || errorMessage.includes("billing")) {
         errorTitle = "API Quota Exceeded";
-        errorMessage = "Your OpenAI API quota has been exceeded. Please check your billing status or try using a different model.";
+        errorMessage = "Your OpenAI API quota has been exceeded. Please check your billing status, try using a different model, or enable Demo Mode.";
       } else if (errorMessage.includes("rate limit")) {
         errorTitle = "Rate Limit Reached";
-        errorMessage = "You've hit the OpenAI rate limit. Please wait a moment and try again.";
+        errorMessage = "You've hit the OpenAI rate limit. Please wait a moment and try again, or enable Demo Mode.";
       } else if (errorMessage.includes("model_not_found") || errorMessage.includes("doesn't have access")) {
         errorTitle = "Model Access Issue";
-        errorMessage = "Your API key doesn't have access to the selected model. Try selecting a different model below.";
+        errorMessage = "Your API key doesn't have access to the selected model. Try selecting a different model or enable Demo Mode.";
       }
       
       toast({
@@ -191,8 +190,8 @@ export default function CodeAssessment() {
         Code Assessment Tool
       </h1>
       
-      <ApiKeyInput onApiKeySet={handleApiKeySet} />
-      <ModelSelector />
+      <ApiKeyInput onApiKeySet={setIsApiKeySet} />
+      {!isDemoMode() && <ModelSelector />}
       
       <Card className="p-6">
         <Form {...form}>
