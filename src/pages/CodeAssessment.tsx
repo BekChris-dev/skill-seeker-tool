@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -184,6 +185,9 @@ export default function CodeAssessment() {
     setIsApiKeySet(isSet);
   };
 
+  // Check if analysis is allowed: either API key is set OR demo mode is enabled
+  const isAnalysisAllowed = isApiKeySet || isDemoMode();
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8 text-center">
@@ -295,13 +299,13 @@ export default function CodeAssessment() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isAnalyzing || !isApiKeySet}
+              disabled={isAnalyzing || !isAnalysisAllowed}
             >
               {isAnalyzing ? "Analyzing..." : "Analyze Code"}
             </Button>
-            {!isApiKeySet && (
+            {!isAnalysisAllowed && (
               <p className="text-center text-sm text-muted-foreground">
-                Please set your API key above to enable code analysis
+                Please set your API key or enable demo mode above to continue
               </p>
             )}
           </form>
