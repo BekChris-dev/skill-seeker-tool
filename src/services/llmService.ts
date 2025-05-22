@@ -27,14 +27,31 @@ export const analyzeCode = async (
 
   for (const candidate of candidates) {
     try {
+      console.log(`Starting analysis for candidate: ${candidate.name}`);
+      
+      // Skip candidates with no code source
+      if ((!candidate.githubRepo || candidate.githubRepo.trim() === '') &&
+          (!candidate.localPath || candidate.localPath.trim() === '')) {
+        console.log(`Skipping candidate ${candidate.name} - no code source provided`);
+        continue;
+      }
+      
       // Get code content based on source (GitHub or local)
+      console.log(`Fetching code content for ${candidate.name}`);
       const codeContent = await fetchCodeContent(candidate);
+      console.log(`Code content fetched, length: ${codeContent.length} characters`);
+      
+      if (!codeContent || codeContent.trim() === '') {
+        throw new Error("No code content could be retrieved.");
+      }
       
       // Prepare prompt for LLM analysis
       const prompt = generateAnalysisPrompt(codeContent, assessmentInfo);
       
       // Call LLM API with the prompt
+      console.log(`Calling LLM API for ${candidate.name}...`);
       const analysisResult = await callLLMApi(prompt);
+      console.log(`LLM API response received for ${candidate.name}`);
       
       // Parse the LLM response into our candidate result format
       const candidateResult = parseLLMResponse(analysisResult, candidate);
@@ -43,10 +60,15 @@ export const analyzeCode = async (
       console.error(`Error analyzing code for candidate ${candidate.name}:`, error);
       toast({
         title: `Analysis failed for ${candidate.name}`,
-        description: "Could not analyze the code. Please try again.",
+        description: error instanceof Error ? error.message : "Could not analyze the code. Please try again.",
         variant: "destructive",
       });
     }
+  }
+
+  // If no results were obtained, throw an error
+  if (results.length === 0) {
+    throw new Error("No valid analysis results were obtained. Please check your inputs and API key.");
   }
 
   // Sort by overall score (highest first)
@@ -160,6 +182,7 @@ const callLLMApi = async (prompt: string): Promise<string> => {
 
   // Example using OpenAI API - replace with your preferred LLM provider
   try {
+    console.log("Making OpenAI API request...");
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -174,27 +197,48 @@ const callLLMApi = async (prompt: string): Promise<string> => {
       }),
     });
 
+    console.log("OpenAI API Response Status:", response.status);
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'API request failed');
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.error?.message || response.statusText || 'Unknown API error';
+      console.error("OpenAI API Error:", errorData);
+      throw new Error(`API request failed: ${errorMessage}`);
     }
 
     const data = await response.json();
+    console.log("OpenAI API Response:", data);
+    
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error("No response content received from API");
+    }
+    
     return data.choices[0].message.content;
   } catch (error) {
     console.error("Error calling LLM API:", error);
-    throw new Error("Failed to analyze code with LLM");
+    throw error instanceof Error 
+      ? error 
+      : new Error("Failed to analyze code with LLM: Unknown error");
   }
 };
 
 // Parse the LLM response into our CandidateResult format
 const parseLLMResponse = (llmResponse: string, candidate: CandidateData): CandidateResult => {
   try {
+    console.log("Parsing LLM response:", llmResponse.substring(0, 100) + "...");
+    
     // Extract JSON from the response (in case the LLM wraps it in text)
     const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : llmResponse;
     
-    const parsedResponse = JSON.parse(jsonStr);
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(jsonStr);
+      console.log("Successfully parsed JSON response");
+    } catch (jsonError) {
+      console.error("JSON parse error:", jsonError);
+      throw new Error("Failed to parse LLM response as JSON");
+    }
     
     // Ensure all required fields exist, providing defaults if missing
     const result: CandidateResult = {

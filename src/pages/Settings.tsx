@@ -1,14 +1,24 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, AlertCircle } from 'lucide-react';
 import ApiKeyInput from "@/components/assessment/ApiKeyInput";
+import { getApiKey } from "@/services/llmService";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Settings() {
+  const [isKeySet, setIsKeySet] = useState(false);
+  
+  useEffect(() => {
+    // Check if API key is set when component mounts
+    setIsKeySet(!!getApiKey());
+  }, []);
+
   const handleApiKeySet = (isSet: boolean) => {
     console.log("API key set:", isSet);
+    setIsKeySet(isSet);
   };
 
   return (
@@ -36,6 +46,17 @@ export default function Settings() {
           <CardContent>
             <ApiKeyInput onApiKeySet={handleApiKeySet} />
             
+            {isKeySet && (
+              <Alert className="mt-4" variant="default">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>API Key Status</AlertTitle>
+                <AlertDescription>
+                  Your API key is set and will be used for code analysis. To test if your key works correctly,
+                  try analyzing a code sample on the Code Assessment page.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="mt-6 p-4 bg-muted/50 rounded-lg">
               <h3 className="font-medium mb-2">About LLM Integration</h3>
               <p className="text-sm text-muted-foreground">
@@ -59,6 +80,15 @@ export default function Settings() {
               Model configuration options will be available in future versions. Currently, the tool
               is configured to use OpenAI's GPT-4o model for optimal code analysis results.
             </p>
+            
+            <Alert className="mt-4" variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Access Requirements</AlertTitle>
+              <AlertDescription>
+                Your OpenAI API key must have access to GPT-4o. If you're experiencing issues with the assessment,
+                make sure your account has the correct permissions for this model.
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
       </div>
