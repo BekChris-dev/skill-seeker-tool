@@ -87,7 +87,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            GPT-4o will analyze the GitHub repo directly, including specific branches or pull requests.
+            The project you wish to get analyzed
           </p>
         </div>
 
@@ -99,7 +99,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
             <div className="flex-1">
               <Input
                 value={candidate.localPath}
-                disabled
+                onChange={(e) => updateCandidate(candidate.id, { localPath: e.target.value })}
                 placeholder="No folder selected"
               />
             </div>
