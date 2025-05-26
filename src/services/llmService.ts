@@ -76,21 +76,31 @@ export const analyzeCode = async (
         continue;
       }
       
-      // Determine the code source
-      let codeSource: string;
+      // Determine the code source and prepare content
+      let codeContent: string;
+      let sourceType: 'github' | 'local';
+      
       if (candidate.githubRepo && candidate.githubRepo.trim() !== '') {
         console.log(`Using GitHub repository URL for ${candidate.name}: ${candidate.githubRepo}`);
-        codeSource = candidate.githubRepo;
+        codeContent = candidate.githubRepo;
+        sourceType = 'github';
       } else if (candidate.localPath && candidate.localPath.trim() !== '') {
-        console.log(`Using local path for ${candidate.name}: ${candidate.localPath}`);
-        codeSource = `Local path: ${candidate.localPath}`;
+        console.log(`Using local files for ${candidate.name}: ${candidate.localPath}`);
+        
+        if (candidate.localFiles && candidate.localFiles.codeFiles.length > 0) {
+          // Format local files for analysis
+          codeContent = formatLocalFilesForAnalysis(candidate.localFiles.codeFiles);
+          sourceType = 'local';
+        } else {
+          throw new Error("Local directory selected but no code files were loaded. Please try selecting the directory again.");
+        }
       } else {
         throw new Error("No valid code source provided for the candidate.");
       }
       
-      // Call LLM API with the GitHub URL or local path directly
+      // Call LLM API with the prepared content
       console.log(`Calling LLM API for ${candidate.name}...`);
-      const prompt = generateAnalysisPrompt(codeSource, assessmentInfo);
+      const prompt = generateAnalysisPrompt(codeContent, assessmentInfo, sourceType);
       
       // Try with the selected model first, then fall back to less expensive models if needed
       let analysisResult;
@@ -167,6 +177,28 @@ export const analyzeCode = async (
 
   // Sort by overall score (highest first)
   return results.sort((a, b) => b.scores.overallScore - a.scores.overallScore);
+};
+
+// Format local files for LLM analysis
+const formatLocalFilesForAnalysis = (codeFiles: Array<{name: string; path: string; content: string; type: string}>): string => {
+  let formattedContent = "LOCAL PROJECT FILES:\n\n";
+  
+  // Add project structure overview
+  formattedContent += "PROJECT STRUCTURE:\n";
+  codeFiles.forEach(file => {
+    formattedContent += `- ${file.path} (${file.type})\n`;
+  });
+  formattedContent += "\n";
+  
+  // Add file contents
+  formattedContent += "FILE CONTENTS:\n\n";
+  codeFiles.forEach(file => {
+    formattedContent += `=== ${file.path} ===\n`;
+    formattedContent += `File Type: ${file.type}\n`;
+    formattedContent += `Content:\n${file.content}\n\n`;
+  });
+  
+  return formattedContent;
 };
 
 // Generate mock results for demo mode
@@ -250,21 +282,23 @@ const generateMockResults = (
   }).sort((a, b) => b.scores.overallScore - a.scores.overallScore); // Sort by overall score
 };
 
-// Generate a prompt for the LLM to analyze the GitHub repository directly
-const generateAnalysisPrompt = (codeSource: string, assessmentInfo: AssessmentInfo): string => {
-  const isGitHubUrl = codeSource.includes('github.com');
+// Generate a prompt for the LLM to analyze the code
+const generateAnalysisPrompt = (codeContent: string, assessmentInfo: AssessmentInfo, sourceType: 'github' | 'local'): string => {
+  const isGitHub = sourceType === 'github';
 
   return `
-    As a coding expert, please analyze the following ${isGitHubUrl ? 'GitHub repository' : 'code'} for a ${assessmentInfo.roleName} position at ${assessmentInfo.seniorityLevel} level.
+    As a coding expert, please analyze the following ${isGitHub ? 'GitHub repository' : 'local project'} for a ${assessmentInfo.roleName} position at ${assessmentInfo.seniorityLevel} level.
     
     Assessment description: ${assessmentInfo.assessmentDescription || "No specific assessment description provided"}
     
-    ${isGitHubUrl ? 'GitHub Repository URL:' : 'Code Source:'} ${codeSource}
+    ${isGitHub ? 'GitHub Repository URL:' : 'Local Project Code:'} 
+    ${codeContent}
     
-    ${isGitHubUrl ? 
+    ${isGitHub ? 
     `Please browse the repository contents directly. If this is a specific branch or pull request URL, please examine that specific code.
     Look through the code files, focusing on the main application logic, and ignoring build artifacts, dependencies, and non-code files.` : 
-    'Please analyze the provided code.'}
+    `Please analyze the provided local project files. The project structure and file contents are included above.
+    Focus on the main application logic and code quality across all provided files.`}
     
     Analyze the code for:
     1. Readability (variable names, comments, consistent style)

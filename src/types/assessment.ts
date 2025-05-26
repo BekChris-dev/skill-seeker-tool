@@ -1,10 +1,18 @@
-
 export interface CandidateData {
   id: string;
   name: string;
   githubRepo: string;
   localPath: string;
   codeAnalyzed: boolean;
+  localFiles?: {
+    fileCount: number;
+    codeFiles: Array<{
+      name: string;
+      path: string;
+      content: string;
+      type: string;
+    }>;
+  };
 }
 
 export interface AssessmentScores {

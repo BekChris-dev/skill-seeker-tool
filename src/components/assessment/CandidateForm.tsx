@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CandidateData } from "@/types/assessment";
-import { X, Folder, Github, GitBranch, GitPullRequest } from "lucide-react";
+import { X, Folder, Github, GitBranch, GitPullRequest, CheckCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { selectDirectory, selectDirectoryFallback, isFileSystemAccessSupported, DirectoryAnalysis } from "@/services/fileSystemService";
 
 interface CandidateFormProps {
   candidate: CandidateData;
@@ -20,11 +21,44 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
   removeCandidate,
   isRemovable
 }) => {
+  const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
+  const [directoryAnalysis, setDirectoryAnalysis] = useState<DirectoryAnalysis | null>(
+    candidate.localFiles ? {
+      path: candidate.localPath,
+      fileCount: candidate.localFiles.fileCount,
+      codeFiles: candidate.localFiles.codeFiles,
+      supportedFiles: candidate.localFiles.codeFiles.map(f => f.path)
+    } : null
+  );
+
   const handleLocalFileSelect = async () => {
-    // In a real implementation, this would use the File System Access API
-    // For now, we'll simulate selecting a folder
-    const mockPath = `/Users/developer/projects/assessment-${Math.floor(Math.random() * 1000)}`;
-    updateCandidate(candidate.id, { localPath: mockPath });
+    setIsLoadingDirectory(true);
+    
+    try {
+      let analysis: DirectoryAnalysis | null = null;
+      
+      if (isFileSystemAccessSupported()) {
+        analysis = await selectDirectory();
+      } else {
+        analysis = await selectDirectoryFallback();
+      }
+      
+      if (analysis) {
+        setDirectoryAnalysis(analysis);
+        updateCandidate(candidate.id, { 
+          localPath: analysis.path,
+          codeAnalyzed: false,
+          localFiles: {
+            fileCount: analysis.fileCount,
+            codeFiles: analysis.codeFiles
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error selecting directory:', error);
+    } finally {
+      setIsLoadingDirectory(false);
+    }
   };
 
   return (
@@ -107,11 +141,35 @@ const CandidateForm: React.FC<CandidateFormProps> = ({
               type="button"
               variant="outline"
               onClick={handleLocalFileSelect}
+              disabled={isLoadingDirectory}
             >
               <Folder className="h-4 w-4 mr-2" />
-              Browse
+              {isLoadingDirectory ? 'Loading...' : 'Browse'}
             </Button>
           </div>
+          
+          {directoryAnalysis && (
+            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center gap-2 text-green-800">
+                <CheckCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Directory Loaded</span>
+              </div>
+              <div className="text-xs text-green-700 mt-1">
+                Found {directoryAnalysis.fileCount} code files in "{directoryAnalysis.path}"
+              </div>
+              {directoryAnalysis.supportedFiles.length > 0 && (
+                <div className="text-xs text-green-600 mt-1">
+                  File types: {[...new Set(directoryAnalysis.codeFiles.map(f => f.type))].join(', ')}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {!isFileSystemAccessSupported() && (
+            <p className="text-xs text-amber-600 mt-1">
+              Using fallback file picker - some features may be limited
+            </p>
+          )}
         </div>
       </div>
     </Card>
